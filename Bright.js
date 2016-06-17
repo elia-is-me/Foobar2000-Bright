@@ -1,306 +1,355 @@
-﻿// vim: set ft=javascript fileencoding=utf-8 bomb et:
-//
-// ==PREPROCESSOR==
-// @name "Bright"
-// @version ""
-// @author "Elia >> elia-is-me.github.io"
-// @feature "dragdrop"
-// @feature "v1.4"
+﻿// ==PREPROCESSOR==
+// @version "v1.4"
 // @feature "watch-metadb"
+// @feature "dragdrop"
+// @import "E:\GitHub\Foobar2000-Bright\import\common\common5.js"
 // ==/PREPROCESSOR==
-//
-//
-// Readme:
-//
-//
-//
-//
 
 
-function StringFormat() {
-	var h_align = 0,
-		v_align = 0,
-		trimming = 0,
-		flags = 0;
-	switch (arguments.length) {
-		case 4:
-			flags = arguments[3];
-		case 3:
-			trimming = arguments[2];
-		case 2:
-			v_align = arguments[1];
-		case 1:
-			h_align = arguments[0];
-			break;
-		default:
-			return 0;
-	};
-	return ((h_align << 28) | (v_align << 24) | (trimming << 20) | flags);
-}
 
-function RGBA(r, g, b, a) {
-	return ((a << 24) | (r << 16) | (g << 8) | (b));
-}
+var prop, playlistViewer, ListManager;
 
-function RGB(r, g, b) {
-	return (0xff000000 | (r << 16) | (g << 8) | (b));
-}
+var time222 = (new Date()).getTime();
+var repaint_f1 = repaint_f2 = repaint_f = false;
+var repaint_main1 = repaint_main2 = repaint_main = false;
 
-function toRGB(d) {
-	var d = d - 0xff000000;
-	var r = d >> 16;
-	var g = d >> 8 & 0xFF;
-	var b = d & 0xFF;
-	return [r, g, b];
-}
+//////////////////////////////////////////////////////////////////////////////
 
-function blendColors(c1, c2, factor) {
-	var c1 = toRGB(c1);
-	var c2 = toRGB(c2);
-	var r = Math.round(c1[0] + factor * (c2[0] - c1[0]));
-	var g = Math.round(c1[1] + factor * (c2[1] - c1[1]));
-	var b = Math.round(c1[2] + factor * (c2[2] - c1[2]));
-	return (0xff000000 | (r << 16) | (g << 8) | (b));
-};
+prop = new function() {
 
-function combineColors(bg, color) {
-	var b = toRGB(bg);
-	var c = [getRed(color), getGreen(color), getBlue(color), getAlpha(color) / 255];
-	return RGB((1 - c[3]) * b[0] + c[3] * c[0], (1 - c[3]) * b[1] + c[3] * c[1], (1 - c[3]) * b[2] + c[3] * c[2]);
-}
+    this.Panel = {
+        smoothScroll: window.GetProperty("Panel.smoothScroll", true),
+        refreshInterval: window.GetProperty("Panel.refreshInterval", 30),
+        tooltip: false, // not prepared
+        vimStyle: true, // vim style keyboard shortcuts.
+        customColor: true,
+        customFonts: true,
+    };
 
-function getAlpha(color) {
-	return ((color >> 24) & 0xff);
-}
+    this.Style = {
+        colorScheme: window.GetProperty("Style.colorScheme", "white"),
+        fontName: window.GetProperty("Style.fontName", "segoe ui"),
+        fontSize: window.GetProperty("Style.fontSize", 14),
+    };
 
-function getRed(color) {
-	return ((color >> 16) & 0xff);
-}
+    this.PLST = {
+        groupBy: window.GetProperty("PLST.groupBy", 0),
+        autoCollapse: window.GetProperty("PLST.autoCollapse", false),
+        rowHeight: window.GetProperty("PLST.rowHeight", 35),
+        scrollStep: 3,
+        enableMood: window.GetProperty("PLST.enableMood", true),
+        moodMode: window.GetProperty("PLST.moodMode", 1),
+    };
 
-function getGreen(color) {
-	return ((color >> 8) & 0xff);
-}
+    this.Color = { };
 
-function getBlue(color) {
-	return (color & 0xff);
-}
-
-function setAlpha(color, a) {
-	return ((color & 0x00ffffff) | (a << 24));
-}
-
-function sqrt(a) {
-	return Math.sqrt(a);
-}
-
-function pow(a, b) {
-	var c = b ? b : 2;
-	return Math.pow(a, c);
-}
-
-// if Luminance(c) > 0.6, c is light; else dark.
-function Luminance(color) {
-	color = toRGB(color);
-	return (0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]) / 255.0;
-};
-
-var Seeker = function (nob_img, getfunc, setfunc) {
-    this.nobImg = nob_img ? nob_img : null;
-    this.getPos = (typeof getfunc == "function" ? getfunc : function(){});
-    this.setPos = (typeof setfunc == "function" ? setfunc : function(){});
-    this.pos = this.getPos();
-    this.isDrag = false;
-    this.x, this.y, this.w, this.h;
-    // 
-    this.draw = function (gr, x, y, w, h, y_offset, color1, color2) {
-        if (h <= y_offset * 2) {
-            y_offset = 0;
-        }
-        gr.FillSolidRect(x, y+y_offset, w, h-y_offset*2, color2);
-        if (this.pos > 0 && this.pos <= 1) {
-            gr.FillSolidRect(x, y+y_offset, w*this.pos, h-y_offset*2, color1);
-        }
-        if (this.nobImg) {
-            var img_w = this.nobImg.Width;
-            if (this.pos < 0) {
-                this.pos = 0;
-            }
-            gr.DrawImage(this.nobImg, x+w*this.pos-img_w/2, (h-img_w)/2+y, img_w, img_w, 0, 0, img_w, img_w, 0, 255);
-        }
-        this.x = x; this.y = y; this.w = w; this.h = h;
-    }
-    this.repaint = function () {
-        window.Repaint();
-    }
-    this.update = function() {
-        this.pos = this.getPos();
-        this.repaint();
-    }
-    this.isMouseOver = function(x, y) {
-        var l = (this.nobImg ? this.nobImg.Width/2 : 0);
-        return (x > this.x-l && x < this.x + this.w + l && y > this.y && y < this.y + this.h);
-    }
-    this.down = function(x, y, mask) {
-        if (this.isMouseOver(x, y)) {
-            this.isDrag = true;
-            this.move(x, y);
-        }
-        return this.isDrag;
-    }
-    this.up = function() {
-        this.isDrag = false;
-    }
-    this.move = function (x, y) {
-        if (this.isDrag) {
-            x -= this.x;
-            this.pos = x < 0 ? 0 : x > this.w ? 1 : x / this.w;
-            this.setPos(this.pos);
-            this.repaint();
-        }
-    }
-}
-
-var Button = function(func, tiptext) {
-    this.func = func;
-    this.state = 0;
-    this.isDown = false;
-    //this.tiptext = tiptext;
-    this.draw = function (gr, img, x, y) {
-        this.x = x; this.y = y;
-        this.w = img.Width; this.h = img.Height;
-        var alpha = 0;
-        alpha = (this.state == 2 ? 100 : (this.state == 1 ? 200 : 255));
-        gr.DrawImage(img, this.x, this.y, this.w, this.h, 0, 0, this.w, this.h, 0, 255);
-    }
-    this.repaint = function() {
-        window.RepaintRect(this.x, this.y, this.w+1, this.h+1);
-    }
-    this.isMouseOver = function (x, y) {
-        return (x > this.x && x < this.x + this.w && y > this.y && y < this.y + this.h);
-    }
-    this.changeState = function (s) {
-        if (s == this.state) { return; }
-        this.state = s;
-        this.repaint();
-    }
-    this.down = function (x, y) {
-        if (this.isMouseOver(x, y)) {
-            this.changeState(2);
-            return true;
-        } else {
-            return false;
-        }
-    }
-    this.up = function (x, y) {
-        if (this.isMouseOver(x, y)) {
-            this.changeState(1);
-            return true;
-        } else {
-            this.changeState(0);
-            return false;
-        }
-    }
-    this.move = function (x, y) {
-        if (this.state == 2) {
-            return;
-        } else {
-            if (this.isMouseOver(x, y)) {
-                this.changeState(1);
-            } else {
-                this.changeState(0);
-            }
-        }
-    }
-    this.leave = function () {
-        this.changeState(0);
-    }
-    this.onClick = function (x, y) {
-        if (!this.func || typeof this.func != "function") {
-            return;
-        }
-        this.func(x, y);
-    }
-}
+    this.Font = { };
 
 
-function prepare_images() {
-    // nob images
-    var w = 10;
-    images.nob = gdi.CreateImage(w, w);
-    g = images.nob.GetGraphics();
-    g.SetSmoothingMode(2);
-    g.FillEllipse(1, 1, 7, 7, colors.text);
-    g.SetSmoothingMode(0);
-    images.nob.ReleaseGraphics(g);
-}
+}();
 
-function get_fonts() {
-    var font_;
-    fonts.name = fb.TitleFormat(prop.font_name).Eval(true);
-    //
-    if (!utils.CheckFont(fonts._name)) {
-        try {
-            font_ = (window.InstanceType == 1 ? window.GetFontDUI(3) : window.GetFontCUI(0));
-            fonts.name = font_.Name;
-            fonts.size = font_.Size;
-        } catch (e) {
-            fonts.name = "Segoe UI";
-            fonts.size = 12;
-        }
-    }
-    fonts.time = gdi.Font(prop.font_name, 12);
-}
 
-function get_colors() {
-    if (prop.custom_color) {
-        // ...
-    } else if (window.InstanceType == 1) {
-        colors.text = window.GetColorDUI(ColorTypeDUI.text);
-        colors.back = window.GetColorDUI(ColorTypeDUI.background);
-        colors.back_sel = window.GetColorDUI(ColorTypeDUI.selection);
-        colors.high = window.GetColorDUI(ColorTypeDUI.highlight);
-        if (Luminance(combineColors(colors.back, setAlpha(colors.back_sel, prop.sel_alpha))) > 0.6) {
-            colors.text_sel = RGB(30, 30, 30);
-        } else {
-            colors.text_sel = RGB(235, 235, 235);
-        }
+function getColor() {
+    // 基本颜色
+    prop.Color = {
+        txt: eval(window.GetProperty("Color.Text", "RGB(0, 0, 0)")),
+        bg: eval(window.GetProperty("Color.Bg", "RGB(255, 255, 255)")),
+        bgSel: eval(window.GetProperty("Color.Bg_Sel", "RGB(66, 133, 244)"))
+    };
+    // 计算选中文字颜色
+    if (Luminance(prop.Color.bgSel) > 0.6) {
+        prop.Color.txtSel = RGB(0, 0, 0);
     } else {
-        colors.text = window.GetColorCUI(ColorTypeCUI.text);
-        colors.text_sel = window.GetColorCUI(ColorTypeCUI.selection_text);
-        colors.back = window.GetColorCUI(ColorTypeCUI.background);
-        colors.back_sel = window.GetColorCUI(ColorTypeCUI.selection_background);
-        colors.high = window.GetColorCUI(ColorTypeCUI.active_item_frame);
+        prop.Color.txtSel = RGB(255, 255, 255);
     }
-    return;
+    // 其它颜色
+}
+
+function getFont() {
+
+    prop.Font.list = gdi.Font(prop.Style.fontName, prop.Style.fontSize);
+
+    if (utils.CheckFont("segoe mdl2 assets")) {
+        prop.Font.mdl2 = gdi.Font(prop.Style.fontName, prop.Style.fontSize - 2);
+    } else if (true) {
+        // user defined font collection
+    }
+}
+
+
+plstViewer = new function () {
+
+    var list_dr = [];
+    var list = plman.GetPlaylistItems(-1);
+    var tf_string = fb.TitleFormat("%album artist%^^%album%^^%discnumber%^^[$num(%tracknumber%,2)]^^%title%^^[%artist%]^^$if2(%rating%,0)^^%length%");
+
+    var research = false,
+        research_k = 0;
+    var research_count = 0;
+    var scroll = scroll_ = scroll__ = scroll___ = 0;
+
+
+    this.showNowPlaying = false;
+
+    this.repaint = function () {
+
+        repaint_main1 = repaint_main2;
+        fb.trace(list_dr.length);
+        fb.trace("repaint playlist" + " research " + research);
+
+    }
+
+    this.getList = function(start, compare, force) {
+
+        var Time = fb.CreateProfiler();
+
+        if (start == null) {
+            start = 0;
+            list_dr = [];
+            list = plman.GetPlaylistItems(plman.ActivePlaylist);
+        };
+
+        var temp = "",  metadb;
+        var k = start, total = list.Count;
+        while (k < total) {
+            metadb = list.Item(k);
+            temp = tf_string.EvalWithMetadb(metadb).split("^^");
+            list_dr.push({
+                metadb: metadb,
+                string: temp,
+            });
+            k++;
+            if (!force && Time.Time > 30) {
+                research = true;
+                research_k = k;
+                research_count++;
+                this.repaint();
+                return;
+            }
+        }
+
+        this.repaint();
+        research_count = 0;
+        plman.SetActivePlaylistContext();
+
+    }
+
+    var time_dl,
+        time_s = fb.CreateProfiler();
+
+    this.onTimer = function() {
+        time_dl = time_s.Time;
+        time_s.Reset();
+        // Research
+        if (research) {
+            research = false;
+            this.getList(research_k, "");
+            return false;
+        }
+
+        // Show now playing
+        if (this.showNowPlaying) {
+            if (plman.PlayingPlaylist == plman.ActivePlaylist) {
+                try {
+                    var playingIdx = plman.GetPlayingItemLocation().PlaylistItemIndex;
+                    if (playingIdx >= 0) {
+                    }
+                } catch (e) {
+                    fb.trace(e);
+                }
+            }
+            this.showNowPlaying = false;
+        }
+
+        // Check scroll
+        scroll = this.checkScroll(scroll);
+
+        if (Math.abs(scroll - scroll_) > 0.5) {
+            if (prop.Panel.smoothScroll) {
+                scroll___ += (scroll - scroll___) * (1 - Math.pow(0.9, time_dl / 4));
+                scroll__ += (scroll___ - scroll__) * (1 - Math.pow(0,9, time_dl / 4));
+                scroll_ += (scroll__ - scroll_) * (1 - Math.pow(0,9, time_dl / 4));
+            } else {
+                scroll_ = scroll;
+            }
+            time_s.Reset();
+            fb.trace("on timer");
+            return true;
+        }
+
+        return false;
+    }
+
+    this.checkScroll = function(scroll___) {
+        scroll___ = Math.round(scroll___ / this.rowHeight) * this.rowHeight;
+        if (scroll___ > (this.totalHeight - this.h + this.rowHeight)) 
+            scroll___ = Math.round((this.totalHeight - this.h + this.rowHeight) / this.rowHeight - 0.5) * this.rowHeight;
+        if (this.totalHeight < this.h || scroll___ < 0)
+            scroll___ = 0;
+        return scroll___;
+    }
+
+    this.x = 0;
+    this.y = 0;
+    this.w = 0;
+    this.h = 0;
+
+    this.totalHeight = 0;
+    this.hasScrollbar = false;
+    this.rowHeight = prop.PLST.rowHeight;
+
+
+    this.setSize = function (x, y, w, h) {
+        this.x = x || this.x;
+        this.y = y || this.y;
+        this.w = w || this.w;
+        this.h = h || this.h;
+        //
+        this.totalHeight = list_dr.length * this.rowHeight;
+        this.hasScrollbar = this.totalHeight > this.h;
+    }
+
+    this.getPlayingIdx = function (a, b) {
+        try {
+            var playingItem = plman.GetPlayingItemLocation();
+            var playingIdx = -1;
+            if (playingItem.IsValid && playingItem.PlaylistIndex == plman.ActivePlaylist) {
+                playingIdx = playingItem.PlaylistItemIndex;
+            }
+            for (var i = a; i < b; i++) {
+                if (playingIdx == i)
+                    break;
+            }
+            return playingIdx;
+        } catch (e) {};
+        return -1;
+    }
+
+    this.draw = function(gr) {
+
+        // do not draw bg here
+
+        var start_ = 0, end_ = 0;
+        var ry, rx = this.x + 10,
+            rw = this.w - 20 - (this.hasScrollbar ? 10 : 0);
+
+        start_ = Math.round(scroll_ / this.rowHeight + 0.4);
+        end_ = Math.round((scroll_ + this.h) / this.rowHeight - 0.5);
+        end_ = (list_dr.length < end_) ? list_dr.length : end_;
+
+        for (var i = start_; i < end_; i++) {
+            // calc row y;
+            ry = this.y + this.rowHeight * i - scroll_;
+
+            // Odd/Even
+            gr.FillSolidRect(rx, ry, rw, this.rowHeight, i % 2 ? 0x09ffffff : 0x09000000);
+        }
+
+    }
+
+
+
+    var __this__ = this;
+    window.SetTimeout(function () {
+        list = plman.GetPlaylistItems(plman.ActivePlaylist);
+        scroll = 0;
+        __this__.getList();
+        __this__.repaint();
+    }, 100);
+
+
+}();
+
+
+
+
+var ww, wh;
+var marginTop = 115;
+var tmp_out;
+
+
+function on_size() {
+    ww = window.Width;
+    wh = window.Height;
+    if (!ww || !wh) {
+        return;
+    }
+
+    plstViewer.setSize(0, marginTop, ww, wh - marginTop);
+
+    repaint_main1 = repaint_main2;
+    repaint_f1 = repaint_f2;
+    tmp_out = window.SetInterval(function () {
+        if (window.IsVisible) {
+            repaint_main1 = repaint_main2;
+            repaint_f1 = repaint_f2;
+            tmp_out && window.ClearInterval(tmp_out);
+        }
+    }, 500);
+
+}
+
+
+function on_paint(gr) {
+    if (!repaint_main && !repaint_f) {
+        repaint_main = repaint_f = true;
+    }
+    if (repaint_main) {
+        repaint_main = false;
+        gr.FillSolidRect(0, marginTop, ww, wh - marginTop, 0x20000000);
+        plstViewer.draw(gr);
+    }
+    if (repaint_f) {
+        repaint_f = false;
+    }
 }
 
 
 
+window.SetInterval(function () {
 
-////////////////////////////////////////////////////////////////////////////////////////////
+    var d = new Date();
+    if (d.getTime() - time222 < prop.Panel.refreshInterval - 1)
+        return;
+    else 
+        time222 = d.getTime();
 
-var prop = {
-    font_name: window.GetProperty("Font Name", "Segoe UI"),
-    custom_color: window.GetProperty("Custom Color", false),
-}
+    var repaint_1 = false,
+        repaint_2 = false;
+
+    if (repaint_f1 == repaint_f2) {
+        repaint_f2 = !repaint_f1;
+        repaint_1 = true;
+    }
+    if (repaint_main1 == repaint_main2) {
+        repaint_main2 = !repaint_main1;
+        repaint_2 = true;
+    }
+    
+    // ONTIMER functions
+
+    repaint_2 = plstViewer.onTimer();
+
+    // handle repaint
+    if (repaint_1 && repaint_2) {
+        repaint_main = true;
+        repaint_f = true;
+        fb.trace("full repaint");
+        window.Repaint();
+    } else if (repaint_1) {
+        repaint_f = true;
+        fb.trace("repaint_f");
+        window.RepaintRect(0, 0, ww, marginTop, true);
+    } else if (repaint_2) {
+        repaint_main = true;
+        fb.trace("repaint_main");
+        (wh > marginTop) && 
+            window.RepaintRect(0, marginTop, ww, wh - marginTop, true);
+    }
+}, 1000);
 
 
 
 
-var AlbumArtId={front:0,back:1,disc:2,icon:3,artist:4};
-var ColorTypeDUI={text:0,background:1,highlight:2,selection:3};
-var ColorTypeCUI={text:0,selection_text:1,inactive_selection_text:2,background:3,selection_background:4,inactive_selection_background:5,active_item_frame:6};
-var FontTypeCUI={items:0,labels:1};
-var FontTypeDUI={defaults:0,tabs:1,lists:2,playlists:3,statusbar:4,console:5};
 
-var images = {}, colors = {}, fonts = {};
-
-
-
-prepare_images();
-
-var b1 = Button();
-var s1 = Seeker();
-
-
-
+//vim: set sw=4 ts=4 ft=javascript fileencoding=utf-8 bomb et:

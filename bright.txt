@@ -1,0 +1,780 @@
+﻿// ==PREPROCESSOR==
+// @version "v1.4"
+// @feature "watch-metadb"
+// @feature "dragdrop"
+// @import "E:\GitHub\Foobar2000-Bright\import\common\common5.js"
+// ==/PREPROCESSOR==
+var time111 = (new Date()).getTime();
+var time222 = time111;
+
+var repaint_f1 = false,
+    repaint_f2 = false,
+    repaint_f = false;
+var repaint_main1 = false,
+    repaint_main2 = false,
+    repaint_main = false;
+
+var ww = 0,
+    wh = 0;
+
+var headerHeight = 115;
+
+
+var prop, plst, toolbar;
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+
+prop = new function() {
+
+    this.Panel = {
+        smoothScroll: window.GetProperty("Panel.smoothScroll", true),
+        refreshInterval: window.GetProperty("Panel.refreshInterval", 30),
+        tooltip: false, // not prepared
+        vimStyle: true, // vim style keyboard shortcuts.
+        customColor: true,
+        customFonts: true,
+    };
+
+    this.Style = {
+        colorScheme: window.GetProperty("Style.colorScheme", "white"),
+        fontName: window.GetProperty("Style.fontName", "segoe ui"),
+        fontSize: window.GetProperty("Style.fontSize", 14),
+    };
+
+    this.PLST = {
+        groupBy: window.GetProperty("PLST.groupBy", 0),
+        autoCollapse: window.GetProperty("PLST.autoCollapse", false),
+        rowHeight: window.GetProperty("PLST.rowHeight", 35),
+        scrollStep: 3,
+        enableMood: window.GetProperty("PLST.enableMood", true),
+        moodMode: window.GetProperty("PLST.moodMode", 1),
+    };
+
+    this.Color = {};
+
+    this.Font = {};
+
+
+}();
+
+
+function getColor() {
+    // 基本颜色
+    prop.Color = {
+        txt: eval(window.GetProperty("Color.Text", "RGB(0, 0, 0)")),
+        bg: eval(window.GetProperty("Color.Bg", "RGB(255, 255, 255)")),
+        bgSel: eval(window.GetProperty("Color.Bg_Sel", "RGB(66, 133, 244)"))
+    };
+    // 计算选中文字颜色
+    if (Luminance(prop.Color.bgSel) > 0.6) {
+        prop.Color.txtSel = RGB(0, 0, 0);
+    } else {
+        prop.Color.txtSel = RGB(255, 255, 255);
+    }
+    // 其它颜色
+}
+
+function getFont() {
+
+    prop.Font.list = gdi.Font(prop.Style.fontName, prop.Style.fontSize);
+    prop.Font.list2 = gdi.Font(prop.Style.fontName, prop.Style.fontSize - 2);
+
+    if (utils.CheckFont("segoe mdl2 assets")) {
+        prop.Font.mdl2 = gdi.Font("segoe mdl2 assets", prop.Style.fontSize - 2);
+    } else if (true) {
+        // user defined font collection
+    }
+}
+
+
+plst = new function() {
+
+    var __this__ = this;
+    var list_dr = [];
+    var list = plman.GetPlaylistItems(-1);
+    var tf_string = fb.TitleFormat("%album artist%^^%album%^^%discnumber%^^[$num(%tracknumber%,2)]^^%title%^^[%artist%]^^$if2(%rating%,0)^^%length%");
+
+    var research = false,
+    research_k = 0;
+    var research_count = 0;
+    var scroll = 0,
+    scroll_ = 0,
+    scroll__ = 0,
+    scroll___ = 0;
+
+
+    this.showNowPlaying = false;
+
+    this.repaint = function() {
+
+        repaint_main1 = repaint_main2;
+
+    }
+
+    this.getList = function(start, compare, force) {
+
+        var Time = fb.CreateProfiler();
+
+        if (start == null) {
+            start = 0;
+            list_dr = [];
+            list = plman.GetPlaylistItems(plman.ActivePlaylist);
+        };
+
+        var temp = "",
+        metadb;
+        var k = start,
+        total = list.Count;
+        while (k < total) {
+            metadb = list.Item(k);
+            temp = tf_string.EvalWithMetadb(metadb).split("^^");
+            list_dr.push({
+                metadb: metadb,
+                string: temp,
+            });
+            k++;
+            if (!force && Time.Time > 30) {
+                research = true;
+                research_k = k;
+                research_count++;
+                return;
+            }
+        }
+
+        this.repaint();
+        research_count = 0;
+        plman.SetActivePlaylistContext();
+
+    }
+
+    var time_dl,
+    time_s = fb.CreateProfiler();
+
+    this.onTimer = function() {
+        time_dl = time_s.Time;
+        time_s.Reset();
+        // Research
+        if (research) {
+            research = false;
+            this.getList(research_k, "");
+            return false;
+        }
+
+        // Show now playing
+        if (this.showNowPlaying) {
+            if (plman.PlayingPlaylist == plman.ActivePlaylist) {
+                try {
+                    var playingIdx = plman.GetPlayingItemLocation().PlaylistItemIndex;
+                    if (playingIdx >= 0) {}
+                } catch (e) {
+                    fb.trace(e);
+                }
+            }
+            this.showNowPlaying = false;
+        }
+
+        // Check scroll
+        scroll = this.checkScroll(scroll);
+
+        if (Math.abs(scroll - scroll_) > 0.5) {
+            if (prop.Panel.smoothScroll) {
+                scroll___ += (scroll - scroll___) * (1 - Math.pow(0.9, time_dl / 4));
+                scroll__ += (scroll___ - scroll__) * (1 - Math.pow(0, 9, time_dl / 4));
+                scroll_ += (scroll__ - scroll_) * (1 - Math.pow(0, 9, time_dl / 4));
+            } else {
+                scroll_ = scroll;
+            }
+            time_s.Reset();
+            return true;
+        }
+
+        return false;
+    }
+
+    this.checkScroll = function(scroll___) {
+        scroll___ = Math.round(scroll___ / this.rowHeight) * this.rowHeight;
+        if (scroll___ > (this.totalHeight - this.h + this.rowHeight))
+            scroll___ = Math.round((this.totalHeight - this.h + this.rowHeight) / this.rowHeight - 0.5) * this.rowHeight;
+        if (this.totalHeight < this.h || scroll___ < 0)
+            scroll___ = 0;
+        return scroll___;
+    }
+
+    this.x = 0;
+    this.y = 0;
+    this.w = 0;
+    this.h = 0;
+
+    this.totalHeight = 0;
+    this.hasScrollbar = false;
+    this.rowHeight = prop.PLST.rowHeight;
+
+    this.setSize = function(x, y, w, h) {
+        this.x = x || this.x;
+        this.y = y || this.y;
+        this.w = w || this.w;
+        this.h = h || this.h;
+    }
+
+    this.getPlayingIdx = function(a, b) {
+        try {
+            var playingItem = plman.GetPlayingItemLocation();
+            var playingIdx = -1;
+            if (playingItem.IsValid && playingItem.PlaylistIndex == plman.ActivePlaylist) {
+                playingIdx = playingItem.PlaylistItemIndex;
+            }
+            for (var i = a; i < b; i++) {
+                if (playingIdx == i)
+                    break;
+            }
+            return playingIdx;
+        } catch (e) {};
+        return -1;
+    }
+
+    this.draw = function(gr) {
+
+        // do not draw bg here
+
+        this.totalHeight = list_dr.length * this.rowHeight;
+        this.hasScrollbar = this.totalHeight > this.h;
+
+        var start_ = 0,
+        end_ = 0;
+        var ry, rx = this.x + 10,
+        rw = this.w - 20 - (this.hasScrollbar ? 10 : 0);
+        var isSelected, isFocused, isPlaying;
+
+        start_ = Math.round(scroll_ / this.rowHeight + 0.4);
+        end_ = Math.round((scroll_ + this.h) / this.rowHeight - 0.5);
+        end_ = (list_dr.length < end_) ? list_dr.length : end_;
+
+
+        for (var i = start_; i < end_; i++) {
+            // calc row y;
+            ry = this.y + this.rowHeight * i - scroll_;
+
+            isSelected = plman.IsPlaylistItemSelected(this.activeList, i);
+            isFocused = this.focusIdx == i;
+
+
+            isSelected &&
+                gr.FillSolidRect(rx, ry, rw, this.rowHeight, prop.Color.bgSel);
+
+            // Odd/Even
+            gr.FillSolidRect(rx, ry, rw, this.rowHeight, i % 2 ? 0x09ffffff : 0x09000000);
+
+            isFocused &&
+                gr.DrawRect(rx+1, ry+1, rw-3, this.rowHeight - 3, 1, RGB(127, 127, 127));
+
+            var colorText = prop.Color.txt;
+            if (isSelected) {
+                colorText = prop.Color.txtSel;
+            } else if (isPlaying) {
+                colorText = prop.Color.bgSel;
+            }
+            var colorText2 = blendColors(colorText, prop.Color.bg, 0.3);
+            var leftPad = rx + 15;
+            var rightPad = 15;
+            // Tracknumber
+            var numW = gr.CalcTextWidth("00", prop.Font.list) + 10;
+            gr.GdiDrawText(list_dr[i].string[3], prop.Font.list, colorText, leftPad, ry, numW, this.rowHeight, DT_CENTER | DT_VCENTER | DT_CALCRECT);
+            leftPad += numW + 10;
+            // Mood
+            if (prop.PLST.enableMood) {
+                var moodW = gr.CalcTextWidth("\ue006", prop.Font.mdl2) + 1;
+                gr.GdiDrawText("\ue006", prop.Font.mdl2, colorText, rx + rw - rightPad - moodW, ry, moodW, this.rowHeight, DT_CENTER | DT_VCENTER | DT_CALCRECT);
+                rightPad = moodW + rightPad + 15;
+            }
+            // Duration
+            gr.GdiDrawText(list_dr[i].string[7], prop.Font.list2, colorText2, rx + rw - rightPad - 50, ry, 50, this.rowHeight, DT_CENTER | DT_VCENTER | DT_CALCRECT);
+            rightPad += 50;
+
+            if (this.w >= 625 && this.w < 1000) {
+                gr.GdiDrawText(list_dr[i].string[5], prop.Font.list2, colorText2,
+                        leftPad + (rw - leftPad - rightPad) * 0.6, ry, (rw - leftPad - rightPad) * 0.4, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
+                rightPad += (rw - leftPad - rightPad) * 0.4 + 10;
+            } else if (ww >= 1000) {
+                var albW = (rw - leftPad - rightPad) * 0.35;
+                gr.GdiDrawText(list_dr[i].string[1], prop.Font.list2, colorText2,
+                        rx + rw - rightPad - albW, ry, albW, this.rowHeight, DT_VCENTER | DT_END_ELLIPSIS | DT_CALCRECT | DT_NOPREFIX);
+                rightPad += albW + 10;
+                //
+                var artW = albW / 0.35 * 0.25;
+                gr.GdiDrawText(list_dr[i].string[5], prop.Font.list2, colorText2,
+                        rx + rw - rightPad - artW, ry, artW, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
+                rightPad += artW + 10;
+            }
+
+            // Title
+            gr.GdiDrawText(list_dr[i].string[4], prop.Font.list, colorText,
+                    leftPad, ry, rw - leftPad - rightPad, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+        }
+
+
+        // Scrollbar
+        var cursorY, cursorH;
+        if (this.h < this.totalHeight) {
+            cursorH = Math.round(this.h / this.totalHeight * this.h);
+            cursorH = (cursorH < 25 ? 25 : cursorH);
+            cursorY = this.y + Math.round((this.h - cursorH) * scroll_ / (this.totalHeight - this.h));
+            gr.FillSolidRect(ww - 9, cursorY, 8, cursorH, prop.Color.txt & 0x33ffffff);
+        }
+
+    }
+
+    this.activeList = plman.ActivePlaylist;
+    this.focusIdx = plman.GetPlaylistFocusItemIndex(this.activeList);
+    this.ShiftStartIdx = -1;
+
+    this.onMouseWheel = function(step) {
+        scroll -= step * this.rowHeight * 3;
+    };
+
+    this.selectRange = function(from, to) {
+        var indexes = [];
+        if (from > to) {
+            var c = from;
+            from = to;
+            to = c;
+        }
+        for (var i = from; i <= to; i++) {
+            indexes.push(i);
+        }
+        plman.ClearPlaylistSelection(this.activeList);
+        plman.SetPlaylistSelection(this.activeList, indexes, true);
+    }
+
+
+    var oldIdx = -1;
+    var actionNotAllowed = false;
+
+    this.rowDrag = false;
+    this.fileDrag = false;
+    this.dragOverIdx = -1;
+    this.clickOnSelection = false;
+
+
+    this.onMouse = function (event, x, y, mask) {
+        var holdShift = utils.IsKeyPressed(VK_SHIFT);
+        var holdControl = utils.IsKeyPressed(VK_CONTROL);
+        var isOverList = (x > this.x && x < this.x + this.w 
+                - (this.hasScrollbar ? 10 : 0) 
+                && y > this.y && y < this.y + this.h);
+        var isOverScrollbar = this.hasScrollbar && (x > this.x + this.w - 10 &&
+                x < this.x + this.w && y > this.y && y < this.y + this.h);
+        var thisIdx;
+
+        // get hovered/active row index.
+        
+        if (isOverList) {
+            thisIdx = Math.round((y + scroll - this.y) / this.rowHeight - 0.5);
+            if (thisIdx >= list_dr.length)
+                thisIdx = list_dr.length;
+        } else {
+            thisIdx = -1;
+        }
+
+        switch (event) {
+            case "down":
+                // clear sel if click on empty line
+                if (thisIdx == list_dr.length) {
+                    if (!holdShift && holdControl) {
+                        plman.ClearPlaylistSelection(this.activeList);
+                        this.SelStart = -1;
+                        return;
+                    }
+                } else if (thisIdx != -1) {
+                    // click on list items
+                    if (holdShift) {
+                        if (this.focusIdx != thisIdx && plman.IsPlaylistItemSelected(this.activeList, this.focusIdx)) {
+                            if (this.SelStart > -1) {
+                                this.selectRange(this.SelStart, thisIdx);
+                            } else {
+                                this.selectRange(this.focusIdx, thisIdx);
+                            }
+                        } else {
+                            plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, true);
+                            this.SelStart = thisIdx;
+                        }
+                        plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                    } else if (holdControl) {
+                        if (plman.IsPlaylistItemSelected(this.activeList, thisIdx)) {
+                            plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, false);
+                        } else {
+                            plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, true);
+                            plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                        }
+                        this.SelStart = thisIdx;
+                    } else {
+                        if (plman.IsPlaylistItemSelected(this.activeList, thisIdx)) {
+                            this.clickOnSelection = true;
+                            this.dragX = x;
+                            this.dragY = y;
+                        } else {
+                            this.clickOnSelection = false;
+                            plman.ClearPlaylistSelection(this.activeList);
+                            plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, true);
+                        }
+                        plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                        this.SelStart = thisIdx;
+                    }
+                    this.repaint();
+                }
+                break;
+            case "dblclk":
+                if (isOverScrollbar) {
+                    // ...
+                } else if (thisIdx > -1 && thisIdx < list_dr.length) {
+
+                     // ... rating ...
+
+                    plman.ExecutePlaylistDefaultAction(this.activeList, thisIdx);
+                    this.repaint();
+                }
+                break;
+            case "move":
+                // ... scrollbar ...
+                
+                var tempY = this.splitY;
+                var thisIdx_Y = -1;
+                this.splitY = -1;
+
+                if (this.clickOnSelection) {
+                    if (this.dragX != x || this.dragY != y) {
+                        this.rowDrag = true;
+                        this.dragX = x;
+                        this.dragY = y;
+                    }
+                    if (this.rowDrag) {
+                        if (thisIdx > -1 && thisIdx < list_dr.length) {
+                            thisIdx_Y = this.y + thisIdx * this.rowHeight - scroll_;
+                            this.splitY = y > thisIdx_Y + this.rowHeight / 2 ? thisIdx_Y + this.rowHeight : thisIdx_Y;
+                        } else if (thisIdx == list_dr.length) {
+                            this.splitY = this.y + this.totalHeight;
+                        }
+                    };
+                    (this.splitY != tempY) && this.repaint();
+
+                    if (this.rowDrag && this.hasScrollbar) {
+                        // && !this.actionNowAllowed
+                        if (y < this.y + this.rowHeight / 2) {
+                            this.startScroll(1);
+                        } else if (y > this.y + this.h - this.rowHeight / 2) {
+                            this.startScroll(-1);
+                        } else {
+                            this.stopScroll();
+                        }
+                    }
+                }
+
+                // auto scroll
+
+
+                break;
+            case "up":
+                // scrollbar ...
+
+                if (this.scrolling) {
+                    this.stopScroll();
+                }
+
+                if (this.clickOnSelection) {
+                    if (this.rowDrag) {
+
+                    } else {
+                        if (thisIdx > -1 && thisIdx < list_dr.length) {
+                            plman.ClearPlaylistSelection(this.activeList);
+                            plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, true);
+                            plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                        }
+                    }
+                }
+                this.rowDrag = false;
+                this.clickOnSelection = false;
+                this.repaint();
+                window.SetCursor(32512);
+                break;
+            case "right":
+                break;
+            case "wheel":
+                scroll -= mask * this.rowHeight * 3;
+                break;
+            case "leave":
+                this.rowDrag = false;
+                this.clickOnSelection = false;
+                break;
+            default:
+                break;
+        }
+
+    }
+
+    var __timer__ = {};
+
+    this.startScroll = function(delta, func) {
+        if (this.scrolling) return;
+        __timer__.timeout = window.SetTimeout(function() {
+            __timer__.interval = window.SetInterval(function() {
+                __this__.onMouse("wheel", 0, 0, delta);
+                if (scroll <= 0 || scroll + __this__.h >= __this__.totalHeight) {
+                    __this__.stopScroll();
+                }
+            }, 100);
+        }, 350);
+        this.scrolling = true;
+    }
+
+    this.stopScroll = function() {
+        __timer__.timeout && window.ClearTimeout(__timer__.timeout);
+        __timer__.timeout = undefined;
+        __timer__.interval && window.ClearInterval(__timer__.interval);
+        __timer__.interval = undefined;
+        this.scrolling = false;
+    }
+
+
+    window.SetTimeout(function() {
+        //list = plman.GetPlaylistItems(plman.ActivePlaylist);
+        scroll = 0;
+        __this__.getList();
+    }, 100);
+
+
+}();
+
+
+
+
+toolbar = new function() {
+
+
+
+}();
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+
+var tmp_out;
+
+function on_size() {
+    ww = window.Width;
+    wh = window.Height;
+
+    plst.setSize(0, headerHeight, ww, wh - headerHeight);
+
+    repaint_main1 = repaint_main2;
+    repaint_f1 = repaint_f2;
+
+    tmp_out && window.ClearInterval(tmp_out);
+    tmp_out = window.SetInterval(function() {
+        if (window.IsVisible) {
+            repaint_main1 = repaint_main2;
+            repaint_f1 = repaint_f2;
+            tmp_out && window.ClearInterval(tmp_out);
+        }
+    }, 500);
+};
+
+
+function on_paint(gr) {
+
+    if (!repaint_main && !repaint_f) {
+        repaint_main = repaint_f = true;
+    }
+
+    if (repaint_main) {
+        repaint_main = false;
+        //gr.FillSolidRect(0, headerHeight, ww, wh - headerHeight, 0x2000aabb);
+        plst.draw(gr);
+    }
+
+    if (repaint_f) {
+        repaint_f = false;
+        //gr.FillSolidRect(0, 0, ww, headerHeight, 0x50000000);
+    }
+}
+
+function on_timer__() {
+
+    var d = new Date();
+    if (d.getTime() - time222 < prop.Panel.refreshInterval - 1)
+        return;
+    else
+        time222 = d.getTime();
+
+    var repaint_1 = repaint_2 = false;
+
+    if (repaint_f1 == repaint_f2) {
+        repaint_f2 = !repaint_f1;
+        repaint_1 = true;
+    }
+    if (repaint_main1 == repaint_main2) {
+        repaint_main2 = !repaint_main1;
+        repaint_2 = true;
+    }
+
+
+    var repaint_list = plst.onTimer();
+    repaint_2 = repaint_2 || repaint_list;
+
+
+    if (repaint_1 && repaint_2) {
+        repaint_main = repaint_f = true;
+        //fb.trace('full repaint');
+        window.Repaint();
+    } else {
+        if (repaint_1) {
+            repaint_f = true;
+            //fb.trace('repaint 1');
+            window.RepaintRect(0, 0, ww, headerHeight);
+        } else if (repaint_2) {
+            repaint_main = true;
+            //fb.trace('repaint 2');
+            window.RepaintRect(0, headerHeight, ww, wh - headerHeight);
+        }
+    }
+}
+
+function on_mouse_wheel(step) {
+    repaint_main1 = repaint_main2;
+    //plst.onMouseWheel(step);
+    plst.onMouse("wheel", 0, 0, step);
+}
+
+function on_mouse_lbtn_down(x, y, mask) {
+
+    plst.onMouse("down", x, y, mask);
+
+}
+
+function on_mouse_lbtn_dblclk(x, y, mask) {
+
+    plst.onMouse("dblclk", x, y, mask);
+
+}
+
+function on_mouse_move(x, y) {
+
+    plst.onMouse("move", x, y);
+
+}
+
+function on_mouse_lbtn_up( x, y, mask) {
+
+    plst.onMouse("up", x, y, mask);
+
+}
+
+function on_mouse_rbtn_up(x, y, mask) {
+
+    plst.onMouse("right", x, y, mask);
+
+}
+
+
+
+
+function on_playback_pause(state) {
+    plst.repaint();
+}
+
+function on_playback_edited(metadb) {
+    plst.repaint();
+}
+
+function on_playback_stop(reason) {
+    plst.repaint();
+}
+
+function on_playback_queue_changed() {
+    plst.repaint();
+}
+
+
+function on_playlist_switch() {
+    scroll = 0;
+    plst.getList();
+    repaint_f1 = repaint_f2;
+
+    utils.PlaySound(fb.ProfilePath + "se_plst00.wav", 0);
+    if (plman.PlayingPlaylist == plman.ActivePlaylist) {
+        plst.showNowPlaying = true;
+    }
+}
+
+function on_playlists_changed() {
+    plst.getList();
+}
+
+function on_playlist_items_reordered(playlist) {
+    if (playlist != plman.ActivePlaylist)
+        return;
+    plst.getList();
+}
+
+function on_playlist_items_removed(playlist) {
+    on_playlist_items_reordered(playlist);
+}
+
+function on_playlist_items_added(playlist) {
+    on_playlist_items_reordered(playlist);
+}
+
+function on_playlist_items_selection_change() {
+    plst.repaint();
+}
+
+function on_selection_changed() {
+    plst.repaint();
+}
+
+
+function on_item_focus_change(playlist, from, to) {
+    plst.focusIdx = plman.GetPlaylistFocusItemIndex(plst.activeList);
+    plst.repaint();
+};
+
+function on_drag_drop(action, x, y, mask) {
+    var idx;
+    if (!fb.PlaylistCount) {
+        idx = plman.CreatePlaylist(0, "Default");
+        plman.ActivePlaylist = 0;
+    } else {
+        plman.ClearPlaylistSelection(active_list);
+        idx = active_list;
+    }
+    if (idx != undefined) {
+        action.ToPlaylist();
+        action.Playlist = idx;
+        action.ToSelect = true;
+    }
+}
+
+
+function on_notify_data(name, info) {
+
+    // ...
+
+}
+
+
+
+
+getColor();
+getFont();
+
+
+
+window.SetInterval(on_timer__, prop.Panel.refreshInterval);
+
+
+
+
+// vim: set ft=javascript fileencoding=utf-8 bomb sw=4 ts=4 et:
