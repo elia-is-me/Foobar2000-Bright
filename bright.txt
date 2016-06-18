@@ -181,9 +181,11 @@ plst = new function() {
 
         if (Math.abs(scroll - scroll_) > 0.5) {
             if (prop.Panel.smoothScroll) {
-                scroll___ += (scroll - scroll___) * (1 - Math.pow(0.9, time_dl / 4));
-                scroll__ += (scroll___ - scroll__) * (1 - Math.pow(0, 9, time_dl / 4));
-                scroll_ += (scroll__ - scroll_) * (1 - Math.pow(0, 9, time_dl / 4));
+                //scroll___ += (scroll - scroll___) * (1 - Math.pow(0.9, time_dl / 4));
+                //scroll__ += (scroll___ - scroll__) * (1 - Math.pow(0, 9, time_dl / 4));
+                //scroll_ += (scroll__ - scroll_) * (1 - Math.pow(0, 9, time_dl / 4));
+                scroll__ += (scroll - scroll__) / 3;
+                scroll_ += (scroll__ - scroll_) / 3;
             } else {
                 scroll_ = scroll;
             }
@@ -203,20 +205,15 @@ plst = new function() {
         return scroll___;
     }
 
-    this.x = 0;
-    this.y = 0;
-    this.w = 0;
-    this.h = 0;
-
     this.totalHeight = 0;
     this.hasScrollbar = false;
     this.rowHeight = prop.PLST.rowHeight;
 
     this.setSize = function(x, y, w, h) {
-        this.x = x || this.x;
-        this.y = y || this.y;
-        this.w = w || this.w;
-        this.h = h || this.h;
+        this.x = x || this.x || 0;
+        this.y = y || this.y || 0;
+        this.w = w || this.w || 0;
+        this.h = h || this.h || 0;
     }
 
     this.getPlayingIdx = function(a, b) {
@@ -235,7 +232,7 @@ plst = new function() {
         return -1;
     }
 
-    this.draw = function(gr) {
+    this.draw = function(gr, font, color) {
 
         // do not draw bg here
 
@@ -314,6 +311,11 @@ plst = new function() {
                     leftPad, ry, rw - leftPad - rightPad, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
 
         }
+
+        // drag split line
+
+        (this.splitY > -1) &&
+            gr.FillSolidRect(rx, this.splitY-1, rw, 2, RGB(127, 127, 127));
 
 
         // Scrollbar
@@ -402,12 +404,14 @@ plst = new function() {
                             this.SelStart = thisIdx;
                         }
                         plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                        this.focusIdx = thisIdx;
                     } else if (holdControl) {
                         if (plman.IsPlaylistItemSelected(this.activeList, thisIdx)) {
                             plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, false);
                         } else {
                             plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, true);
                             plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                            this.focusIdx = thisIdx;
                         }
                         this.SelStart = thisIdx;
                     } else {
@@ -421,6 +425,7 @@ plst = new function() {
                             plman.SetPlaylistSelectionSingle(this.activeList, thisIdx, true);
                         }
                         plman.SetPlaylistFocusItem(this.activeList, thisIdx);
+                        this.focusIdx = thisIdx;
                         this.SelStart = thisIdx;
                     }
                     this.repaint();
@@ -432,6 +437,7 @@ plst = new function() {
                 } else if (thisIdx > -1 && thisIdx < list_dr.length) {
 
                      // ... rating ...
+                     // TODO: maybe rating/unrating on single left click
 
                     plman.ExecutePlaylistDefaultAction(this.activeList, thisIdx);
                     this.repaint();
@@ -460,6 +466,8 @@ plst = new function() {
                     };
                     (this.splitY != tempY) && this.repaint();
 
+                    // auto scroll
+                    
                     if (this.rowDrag && this.hasScrollbar) {
                         // && !this.actionNowAllowed
                         if (y < this.y + this.rowHeight / 2) {
@@ -471,10 +479,6 @@ plst = new function() {
                         }
                     }
                 }
-
-                // auto scroll
-
-
                 break;
             case "up":
                 // scrollbar ...
@@ -485,6 +489,46 @@ plst = new function() {
 
                 if (this.clickOnSelection) {
                     if (this.rowDrag) {
+                        if (thisIdx > -1 && thisIdx < list_dr.length) {
+
+                            var selection = plman.GetPlaylistSelectedItems(this.activeList);
+                            var delta, sel = [];
+                            var targetIdx, thisIdx_Y;
+
+                            thisIdx_Y = this.y + thisIdx * this.rowHeight - scroll_;
+                            targetIdx = thisIdx + (y > thisIdx_Y + this.rowHeight / 2 ? 0: 1);
+                            delta = targetIdx;
+
+                            if (selection.Count >= 1) {
+                                var add = 0;
+
+                                for (var i = 0; i < list_dr.length; i++) {
+                                    if (plman.IsPlaylistItemSelected(this.activeList, i)) {
+                                        sel.push(i);
+                                    }
+                                }
+                                for (var i = 0; i < sel.length; i++) {
+                                    if (sel[i] > targetIdx)
+                                        //add++;
+                                        delta++;
+                                    //else break;
+                                } 
+                                //delta += add;
+                            } else {
+                            }
+
+                            //plman.MovePlaylistSelection(this.activeList, -list_dr.length);
+                            if (thisIdx == this.focusIdx) {
+                            } else {
+                                if (this.focusIdx > thisIdx) {
+                                    targetIdx = thisIdx + (y > thisIdx_Y + this.rowHeight / 2 ? 1: 2);
+                                    plman.MovePlaylistSelection(this.activeList, this.focusIdx - targetIdx);
+                                }
+                            }
+
+                        } else {
+
+                        }
 
                     } else {
                         if (thisIdx > -1 && thisIdx < list_dr.length) {
@@ -494,8 +538,9 @@ plst = new function() {
                         }
                     }
                 }
-                this.rowDrag = false;
                 this.clickOnSelection = false;
+                this.rowDrag = false;
+                this.splitY = -1;
                 this.repaint();
                 window.SetCursor(32512);
                 break;
@@ -520,7 +565,7 @@ plst = new function() {
         if (this.scrolling) return;
         __timer__.timeout = window.SetTimeout(function() {
             __timer__.interval = window.SetInterval(function() {
-                __this__.onMouse("wheel", 0, 0, delta);
+                __this__.onMouse("wheel", 0, 0, delta/3);
                 if (scroll <= 0 || scroll + __this__.h >= __this__.totalHeight) {
                     __this__.stopScroll();
                 }
@@ -566,6 +611,8 @@ var tmp_out;
 function on_size() {
     ww = window.Width;
     wh = window.Height;
+
+    ww = ww < 320 ? 320 : ww;
 
     plst.setSize(0, headerHeight, ww, wh - headerHeight);
 
@@ -769,8 +816,6 @@ function on_notify_data(name, info) {
 
 getColor();
 getFont();
-
-
 
 window.SetInterval(on_timer__, prop.Panel.refreshInterval);
 
