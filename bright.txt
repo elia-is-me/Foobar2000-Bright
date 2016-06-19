@@ -4,6 +4,7 @@
 // @feature "dragdrop"
 // @import "E:\GitHub\Foobar2000-Bright\import\common\common5.js"
 // ==/PREPROCESSOR==
+
 var time111 = (new Date()).getTime();
 var time222 = time111;
 
@@ -17,12 +18,13 @@ var repaint_main1 = false,
 var ww = 0,
     wh = 0;
 
-var headerHeight = 115 + 43;
+var header_height = 115;
 
 
 var prop, plst, toolbar;
 var images = {};
-var toolbarHeight = 43;
+var toolbar_height = 43;
+var toolbar_width = 50;
 
 
 
@@ -210,7 +212,7 @@ plst = new function() {
     }
 
     this.checkScroll = function(scroll___) {
-        //scroll___ = Math.round(scroll___ / this.rowHeight) * this.rowHeight;
+        scroll___ = Math.round(scroll___ / this.rowHeight) * this.rowHeight;
         if (scroll___ > (this.totalHeight - this.h + this.rowHeight))
             scroll___ = Math.round((this.totalHeight - this.h + this.rowHeight) / this.rowHeight - 0.5) * this.rowHeight;
         if (this.totalHeight < this.h || scroll___ < 0)
@@ -223,10 +225,10 @@ plst = new function() {
     this.rowHeight = prop.PLST.rowHeight;
 
     this.setSize = function(x, y, w, h) {
-        this.x = x || this.x || 0;
-        this.y = y || this.y || 0;
-        this.w = w || this.w || 0;
-        this.h = h || this.h || 0;
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
     }
 
     this.getPlayingIdx = function(a, b) {
@@ -649,6 +651,9 @@ toolbar = new function() {
         this.y = y;
         this.w = w;
         this.h = h;
+        if (this.mode == 1) {
+            this.h = this.h < 350 ? 350 : this.h;
+        }
     }
 
     this.draw = function(gr, font, color) {
@@ -656,30 +661,52 @@ toolbar = new function() {
         //var font = prop.Font;
         gr.FillSolidRect(this.x, this.y, this.w, this.h, setAlpha(color.txt, 13));
 
+        if (this.mode == 0) {
+            buttons = {
+                hamburg: __buttons__.hamburg,
+                loupe: __buttons__.loupe,
+                cog: __buttons__.cog
+            };
+            var tabs = ["列表", "媒体库", "正在播放"];
+            var bw = toolbar_height;
 
-        buttons = {
-            hamburg: __buttons__.hamburg,
-            loupe: __buttons__.loupe,
-            cog: __buttons__.cog
-        };
-        var tabs = ["列表", "媒体库", "正在播放"];
-        var bw = toolbarHeight;
+            buttons.hamburg.draw(gr, images.hamburg, this.x+10, this.y, bw, bw);
 
-        buttons.hamburg.draw(gr, images.hamburg, this.x+10, this.y, bw, bw);
+            var tx = buttons.hamburg.x+55, tw = 0, gap = 33;
+            for (var i = 0; i < tabs.length; i++) {
+                tw = gr.CalcTextWidth(tabs[i], font.tab);
+                gr.GdiDrawText(tabs[i], font.tab, color.txt, tx, this.y, tw, this.h, DT_VCENTER | DT_CALCRECT);
+                tx += tw + gap;
+            }
 
-        var tx = buttons.hamburg.x+55, tw = 0, gap = 33;
-        for (var i = 0; i < tabs.length; i++) {
-            tw = gr.CalcTextWidth(tabs[i], font.tab);
-            gr.GdiDrawText(tabs[i], font.tab, color.txt, tx, this.y, tw, this.h, DT_VCENTER | DT_CALCRECT);
-            tx += tw + gap;
+            buttons.loupe.draw(gr, images.loupe, this.x+this.w - 100, this.y, bw, bw);
+            buttons.cog.draw(gr, images.cog, this.x+this.w-57, this.y, bw, bw);
+
+        } else if (this.mode == 1) {
+            
+            buttons = {
+                hamburg: __buttons__.hamburg,
+                loupe: __buttons__.loupe,
+                playlist: __buttons__.playlist,
+                playlist2: __buttons__.playlist,
+                cog: __buttons__.cog,
+            };
+
+            var by = this.y + 10,
+                bw = toolbar_width;
+            buttons.hamburg.draw(gr, images.hamburg, this.x, by, bw, bw);
+            by += toolbar_height;
+            buttons.loupe.draw(gr, images.loupe, this.x, by, bw, bw);
+            by += toolbar_height;
+            buttons.playlist.draw(gr, images.playlist, this.x, by, bw, bw);
+            by += toolbar_height;
+            buttons.playlist2.draw(gr, images.playlist, this.x, by, bw, bw);
+
+            by = this.y + this.h - bw;
+            buttons.cog.draw(gr, images.cog, this.x, by, bw, bw);
+
         }
-
-        buttons.loupe.draw(gr, images.loupe, this.x+this.w - 100, this.y, bw, bw);
-        buttons.cog.draw(gr, images.cog, this.x+this.w-57, this.y, bw, bw);
     }
-
-
-
 
 }();
 
@@ -714,7 +741,7 @@ function getImages() {
         "cog": "\ue115"
     };
 
-    w = toolbarHeight;
+    w = toolbar_height;
     createImage(icos, font_i, w, w);
     createImage(icos2, font_i2, w, w);
 
@@ -733,8 +760,20 @@ function on_size() {
 
     ww = ww < 320 ? 320 : ww;
 
-    plst.setSize(0, headerHeight, ww, wh - headerHeight);
-    toolbar.setSize(0, 0, ww, toolbarHeight);
+    //plst.setSize(0, header_height, ww, wh - header_height);
+    if (ww < 800) {
+        toolbar.mode = 0;
+        toolbar.setSize(0, 0, ww, toolbar_height);
+    } else {
+        toolbar.mode = 1;
+        toolbar.setSize(0, 0, toolbar_width, wh);
+    }
+
+    if (toolbar.mode == 0) {
+        plst.setSize(0, header_height+toolbar_height, ww, wh - header_height-toolbar_height);
+    } else if (toolbar.mode == 1) {
+        plst.setSize(toolbar_width, header_height, ww - toolbar_width, wh - header_height);
+    }
 
     repaint_main1 = repaint_main2;
     repaint_f1 = repaint_f2;
@@ -752,30 +791,38 @@ function on_size() {
 
 function on_paint(gr) {
 
+    var font = prop.Font,
+        color = prop.Color;
+
     if (!repaint_main && !repaint_f) {
         repaint_main = repaint_f = true;
     }
 
     if (repaint_main) {
         repaint_main = false;
-        //gr.FillSolidRect(0, headerHeight, ww, wh - headerHeight, 0x2000aabb);
+        //gr.FillSolidRect(0, header_height, ww, wh - header_height, 0x2000aabb);
         plst.draw(gr);
+
+        var leftPad = toolbar.mode ? toolbar_width : 0,
+            topPad = toolbar.mode ? 0 : toolbar_height;
+
+        gr.GdiDrawText(plman.GetPlaylistName(plst.activeList), font.header1, color.txt, leftPad + 30, topPad+20, ww - leftPad-30, 65, DT_END_ELLIPSIS);
+
+        var tw = gr.CalcTextWidth("groupby ^", font.list);
+        gr.GdiDrawText("groupby ^", font.list, color.txt, leftPad+30, topPad+75, ww, 35, 0);
+        var tw2 = gr.CalcTextWidth("sortby ^", font.list);
+        gr.GdiDrawText("sortby ^", font.list, color.txt, leftPad+30+tw+35, topPad+75, ww, 35, 0);
+        gr.GdiDrawText("xxx items", font.list, blendColors(font.txt, font.bg, 0.5), leftPad+30+tw+35+tw2+35, topPad+75, ww, 35, 0);
     }
 
     if (repaint_f) {
         repaint_f = false;
-        //gr.FillSolidRect(0, 0, ww, headerHeight, 0x50000000);
+        //gr.FillSolidRect(0, 0, ww, header_height, 0x50000000);
         toolbar.draw(gr, prop.Font, prop.Color);
         //
-        gr.GdiDrawText(plman.GetPlaylistName(plst.activeList), prop.Font.header1, prop.Color.txt,
-                    30, toolbarHeight+20, ww - 60, 65, DT_END_ELLIPSIS);
-
-        var tw = gr.CalcTextWidth("groupby ^", prop.Font.list);
-        gr.GdiDrawText("groupby ^", prop.Font.list, prop.Color.txt, 30, toolbarHeight+75, ww, 35, 0);
-        var tw2 = gr.CalcTextWidth("sortby ^", prop.Font.list);
-        gr.GdiDrawText("sortby ^", prop.Font.list, prop.Color.txt, 30+tw+35, toolbarHeight+75, ww, 35, 0);
-        gr.GdiDrawText("xxx items", prop.Font.list, blendColors(prop.Color.txt, prop.Color.bg, 0.5), 30+tw+35+tw2+35, toolbarHeight+75, ww, 35, 0);
     }
+
+    //gr.FillSolidRect(0, 0, ww, wh, setAlpha(color.txt, 150));
 }
 
 function on_timer__() {
@@ -810,11 +857,19 @@ function on_timer__() {
         if (repaint_1) {
             repaint_f = true;
             //fb.trace('repaint 1');
-            window.RepaintRect(0, 0, ww, headerHeight);
+            if (toolbar.mode == 0) {
+                window.RepaintRect(0, 0, ww, toolbar_height);
+            } else {
+                window.RepaintRect(0, 0, toolbar_width, wh);
+            }
         } else if (repaint_2) {
             repaint_main = true;
             //fb.trace('repaint 2');
-            window.RepaintRect(0, headerHeight, ww, wh - headerHeight);
+            if (toolbar.mode == 0) {
+                window.RepaintRect(0, toolbar_height, ww, wh - toolbar_height);
+            } else {
+                window.RepaintRect(toolbar_width, 0, ww - toolbar_width, wh);
+            }
         }
     }
 }
