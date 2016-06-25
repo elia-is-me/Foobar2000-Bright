@@ -5,6 +5,7 @@
 // @import "E:\GitHub\Foobar2000-Bright\import\common\common5.js"
 // ==/PREPROCESSOR==
 
+var fb_wnd = GetFBWnd();
 var time111 = (new Date()).getTime();
 var time222 = time111;
 
@@ -20,16 +21,10 @@ var ww = 0,
 
 var header_height = 115;
 
-
 var prop, plst, toolbar;
 var images = {};
 var toolbar_height = 43;
 var toolbar_width = 50;
-
-
-
-
-
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -60,7 +55,6 @@ prop = new function() {
     };
 
     this.Color = {};
-
     this.Font = {};
 
 
@@ -90,6 +84,9 @@ function getFont() {
     prop.Font.tab = gdi.Font(prop.Style.fontName, 14);
     prop.Font.header1 = gdi.Font(prop.Style.fontName, 30);
 
+    prop.Font.lib = gdi.Font(prop.Style.fontName, prop.Style.fontSize);
+    prop.Font.lib2 = gdi.Font(prop.Style.fontName, prop.Style.fontSize, 1);
+
     if (utils.CheckFont("segoe mdl2 assets")) {
         prop.Font.mdl2 = gdi.Font("segoe mdl2 assets", prop.Style.fontSize - 2);
     } else if (true) {
@@ -104,7 +101,7 @@ plst = new function() {
     var list_dr = [];
     var list = plman.GetPlaylistItems(-1);
     var tf_string = fb.TitleFormat("%album artist%^^%album%^^%discnumber%" +
-            "^^[$num(%tracknumber%,2)]^^%title%^^[%artist%]^^$if2(%rating%,0)^^%length%");
+            "^^[$num(%tracknumber%,2)]^^%title%^^[%artist%]^^$if2(%rating%,0)^^$if2([%length%],--:--)");
 
     var research = false,
     research_k = 0;
@@ -114,13 +111,19 @@ plst = new function() {
     scroll__ = 0,
     scroll___ = 0;
 
+    var __show_now_playing__ = false;
 
-    this.showNowPlaying = false;
+    this.showNowPlaying = function() {
+        __show_now_playing__ = true;
+    };
 
     this.repaint = function() {
-
         repaint_main1 = repaint_main2;
+    }
 
+    function resetScroll() {
+        scroll___ = scroll__ = scroll_ = scroll = 0;
+        scroll_ = 50;
     }
 
     this.getList = function(start, compare, force) {
@@ -128,7 +131,7 @@ plst = new function() {
         var Time = fb.CreateProfiler();
 
         if (start == null) {
-            scroll = 0;
+            resetScroll();
             start = 0;
             list_dr = [];
             list = plman.GetPlaylistItems(plman.ActivePlaylist);
@@ -174,7 +177,7 @@ plst = new function() {
         }
 
         // Show now playing
-        if (this.showNowPlaying) {
+        if (__show_now_playing__) {
             if (plman.PlayingPlaylist == plman.ActivePlaylist) {
                 try {
                     var playingIdx = plman.GetPlayingItemLocation().PlaylistItemIndex;
@@ -188,19 +191,21 @@ plst = new function() {
                     fb.trace(e);
                 }
             }
-            this.showNowPlaying = false;
+            __show_now_playing__ = false;
         }
 
         // Check scroll
         scroll = this.checkScroll(scroll);
 
+        var delta = 1 - Math.pow(0.9, time_dl/6);
+
         if (Math.abs(scroll - scroll_) > 0.5) {
             if (prop.Panel.smoothScroll) {
-                //scroll___ += (scroll - scroll___) * (1 - Math.pow(0.9, time_dl / 4));
-                //scroll__ += (scroll___ - scroll__) * (1 - Math.pow(0, 9, time_dl / 4));
-                //scroll_ += (scroll__ - scroll_) * (1 - Math.pow(0, 9, time_dl / 4));
-                scroll__ += (scroll - scroll__) / 3;
-                scroll_ += (scroll__ - scroll_) / 3;
+                scroll___ += (scroll - scroll___) * delta;
+                scroll__ += (scroll___ - scroll__) * delta;
+                scroll_ += (scroll__ - scroll_) * delta;
+                //scroll__ += (scroll - scroll__) / 3;
+                //scroll_ += (scroll__ - scroll_) / 3;
             } else {
                 scroll_ = scroll;
             }
@@ -212,7 +217,7 @@ plst = new function() {
     }
 
     this.checkScroll = function(scroll___) {
-        scroll___ = Math.round(scroll___ / this.rowHeight) * this.rowHeight;
+        //scroll___ = Math.round(scroll___ / this.rowHeight) * this.rowHeight;
         if (scroll___ > (this.totalHeight - this.h + this.rowHeight))
             scroll___ = Math.round((this.totalHeight - this.h + this.rowHeight) / this.rowHeight - 0.5) * this.rowHeight;
         if (this.totalHeight < this.h || scroll___ < 0)
@@ -291,11 +296,11 @@ plst = new function() {
                     colorText = prop.Color.bgSel;
                 }
                 var colorText2 = blendColors(colorText, prop.Color.bg, 0.3);
-                var leftPad = rx + 15;
+                var leftPad = 15;
                 var rightPad = 15;
                 // Tracknumber
                 var numW = gr.CalcTextWidth("00", prop.Font.list) + 10;
-                gr.GdiDrawText(list_dr[i].string[3], prop.Font.list, colorText, leftPad, ry, numW, this.rowHeight, DT_CENTER | DT_VCENTER | DT_CALCRECT);
+                gr.GdiDrawText(list_dr[i].string[3], prop.Font.list, colorText, rx + leftPad, ry, numW, this.rowHeight, DT_CENTER | DT_VCENTER | DT_CALCRECT);
                 leftPad += numW + 10;
                 // Mood
                 if (prop.PLST.enableMood) {
@@ -309,7 +314,7 @@ plst = new function() {
 
                 if (this.w >= 625 && this.w < 1000) {
                     gr.GdiDrawText(list_dr[i].string[5], prop.Font.list2, colorText2,
-                            leftPad + (rw - leftPad - rightPad) * 0.6, ry, (rw - leftPad - rightPad) * 0.4, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
+                            rx + leftPad + (rw - leftPad - rightPad) * 0.6, ry, (rw - leftPad - rightPad) * 0.4, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
                     rightPad += (rw - leftPad - rightPad) * 0.4 + 10;
                 } else if (ww >= 1000) {
                     var albW = (rw - leftPad - rightPad) * 0.35;
@@ -325,7 +330,7 @@ plst = new function() {
 
                 // Title
                 gr.GdiDrawText(list_dr[i].string[4], prop.Font.list, colorText,
-                        leftPad, ry, rw - leftPad - rightPad, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
+                        rx + leftPad, ry, rw - leftPad - rightPad, this.rowHeight, DT_VCENTER | DT_CALCRECT | DT_END_ELLIPSIS | DT_NOPREFIX);
 
             }
 
@@ -345,11 +350,8 @@ plst = new function() {
             }
 
         } else {
-
             gr.GdiDrawText("空列表", prop.Font.header1, blendColors(prop.Color.txt, prop.Color.bg, 0.5), 
                     this.x + 30, this.y+20, this.w - 60, this.h - 40, 0);
-
-
         }
 
     }
@@ -385,6 +387,7 @@ plst = new function() {
     this.dragOverIdx = -1;
     this.clickOnSelection = false;
 
+    var ratingBtn = new Button(); // TODO
 
     this.onMouse = function (event, x, y, mask) {
         var holdShift = utils.IsKeyPressed(VK_SHIFT);
@@ -617,6 +620,66 @@ plst = new function() {
 
 }();
 
+function MainMenu(x, y, obj) {
+
+    var Menus = {
+        "file": "文件",
+        "edit": "编辑",
+        "view": "视图",
+        "playback": "播放",
+        "library": "媒体库",
+        "help": "帮助"
+    };
+    var child = {}, 
+    menuman = {};
+    var _menu = window.CreatePopupMenu();
+    // INIT
+    for (var i in Menus) {
+        child[i] = window.CreatePopupMenu();
+        child[i].AppendTo(_menu, MF_STRING, Menus[i]);
+        menuman[i] = fb.CreateMainMenuManager();
+        menuman[i].Init(i);
+    }
+    // BUILD
+    menuman.file.BuildMenu(child.file, 1, 200);
+    menuman.edit.BuildMenu(child.edit, 201, 200);
+    menuman.view.BuildMenu(child.view, 401, 200);
+    menuman.playback.BuildMenu(child.playback, 601, 300);
+    menuman.library.BuildMenu(child.library, 901, 300);
+    menuman.help.BuildMenu(child.help, 1201, 100);
+
+    var ret = 0;
+    ret = _menu.TrackPopupMenu(x, y);
+    switch (true) {
+        case (ret >= 1 && ret < 201):
+            menuman.file.ExecuteByID(ret - 1);
+            break;
+        case (ret >= 201 && ret < 401):
+            menuman.edit.ExecuteByID(ret - 201);
+            break;
+        case (ret >= 401 && ret < 601):
+            menuman.view.ExecuteByID(ret - 401);
+            break;
+        case (ret >= 601 && ret < 901):
+            menuman.playback.ExecuteByID(ret - 601);
+            break;
+        case (ret >= 901 && ret < 1201):
+            menuman.library.ExecuteByID(ret - 901);
+            break;
+        case (ret >= 1201 && ret < 1301):
+            menuman.help.ExecuteByID(ret - 1201);
+            break;
+    };
+
+    _menu.Dispose();
+    for (var i in Menus) {
+        child[i].Dispose();
+        menuman[i].Dispose();
+    }
+
+}
+
+
 
 toolbar = new function() {
 
@@ -693,7 +756,7 @@ toolbar = new function() {
             };
 
             var by = this.y + 10,
-                bw = toolbar_width;
+                bw = 50;
             buttons.hamburg.draw(gr, images.hamburg, this.x, by, bw, bw);
             by += toolbar_height;
             buttons.loupe.draw(gr, images.loupe, this.x, by, bw, bw);
@@ -707,6 +770,130 @@ toolbar = new function() {
 
         }
     }
+
+}();
+
+
+library = new function() {
+    var scroll = 0, scroll_ = 0, scroll__ = 0, scroll___ = 0;
+    var tf_group = fb.TitleFormat("$if2([%album artist%],未知艺术家)^^$if2([%album%],未知专辑)^^[%discnumber%]");
+    var tf_sort = fb.TitleFormat("%album artist%^^%album%^^%discnumber%^^%tracknumber%^^%title%");
+    var list_dr = [],
+        list = plman.GetPlaylistItems(-1);
+    var list_empty = list;
+    var research = false,
+        research_k = 0,
+        research_count = 0;
+    var repaint__ = false;
+
+    this.Repaint = function() {
+        repaint_main2 = repaint_main1;
+    }
+
+    function resetScroll() {
+        scroll___ = scroll__ = scroll_ = scroll = 0;
+        scroll_ = 50;
+    }
+
+    this.getLibrary = function() {
+        list = fb.GetLibraryItems();
+        list.OrderByFormat(tf_sort, 1);
+    };
+
+    var ob_temp;
+
+    this.getList = function(start, compare, force) {
+
+        var Time = fb.CreateProfiler();
+
+        if (start == null) {
+            resetScroll();
+            start = 0;
+            compare = "!@#";
+            list_dr = [];
+        }
+
+        var k = start, temp = "",
+            index = list_dr.length,
+            total = list.Count,
+            metadb = undefined;
+
+        while (k < total) {
+            metadb = list.Item(k);
+            temp = tf_group.EvalWithMetadb(metadb);
+            if (temp != compare) {
+                compare = temp;
+                list_dr[index] = {
+                    metadb: metadb,
+                    string: compare.split("^^"),
+                    pl_arr: [k],
+                    pl: list_.Clone().Add(metadb), // ???
+                };
+                index++;
+            } else {
+                list_dr[index-1].pl.Add(metadb);
+                list_dr[index-1].pl_arr.push(k);
+            }
+            k++;
+            if (!force && Time.Time > 30) {
+                research = true;
+                research_k = k;
+                research_count++;
+                return;
+            }
+        }
+
+        this.Repaint();
+
+    }
+
+    this.Init = function() {
+        this.getLibrary();
+        this.getList();
+        this.Repaint();
+    }
+
+    this.checkScroll = function(scroll___) {
+        if (scroll___ > (this.totalHeight - this.h + this.rowHeight))
+            scroll___ = Math.round((this.totalHeight - this.h + this.rowHeight) / this.rowHeight - 0.5) * this.rowHeight;
+        if (this.totalHeight < this.h || scroll___ < 0)
+            scroll___ = 0;
+        return scroll___;
+    }
+
+    var time_dl,
+        time_s = fb.CreateProfiler();
+
+    this.onTimer = function() {
+        time_dl = time_s.Time;
+        time_s.Reset();
+        if (research) {
+            research = false;
+            this.getList(research_k, "");
+            return false;
+        }
+        var delta = (1 - Math.pow(0.9, time_dl / 4));
+        scroll = this.checkScroll();
+
+        if (Math.abs(scroll - scroll_) > 0.5) {
+            if (prop.Panel.smoothScroll) {
+                scroll___ += (scroll - scroll___) * delta;
+                scroll__ += (scroll___ - scroll__) * delta;
+                scroll_ += (scroll__ - scroll_) * delta;
+            } else {
+                scroll_ = scroll;
+            }
+            time_s.Reset();
+            return true; // Repaint
+        };
+
+        return false; // Not repaint
+    }
+
+    this.totalHeight = 0;
+    this.hasScrollbar = false;
+    this.rowHeight = 0;
+
 
 }();
 
@@ -757,15 +944,18 @@ var tmp_out;
 function on_size() {
     ww = window.Width;
     wh = window.Height;
-
     ww = ww < 320 ? 320 : ww;
 
-    //plst.setSize(0, header_height, ww, wh - header_height);
-    if (ww < 800) {
+    if (ww < 600) {
         toolbar.mode = 0;
         toolbar.setSize(0, 0, ww, toolbar_height);
     } else {
         toolbar.mode = 1;
+        if (ww > 800) {
+            toolbar_width = 250;
+        } else {
+            toolbar_width = 50;
+        }
         toolbar.setSize(0, 0, toolbar_width, wh);
     }
 
@@ -800,7 +990,6 @@ function on_paint(gr) {
 
     if (repaint_main) {
         repaint_main = false;
-        //gr.FillSolidRect(0, header_height, ww, wh - header_height, 0x2000aabb);
         plst.draw(gr);
 
         var leftPad = toolbar.mode ? toolbar_width : 0,
@@ -809,20 +998,16 @@ function on_paint(gr) {
         gr.GdiDrawText(plman.GetPlaylistName(plst.activeList), font.header1, color.txt, leftPad + 30, topPad+20, ww - leftPad-30, 65, DT_END_ELLIPSIS);
 
         var tw = gr.CalcTextWidth("groupby ^", font.list);
-        gr.GdiDrawText("groupby ^", font.list, color.txt, leftPad+30, topPad+75, ww, 35, 0);
         var tw2 = gr.CalcTextWidth("sortby ^", font.list);
+        gr.GdiDrawText("groupby ^", font.list, color.txt, leftPad+30, topPad+75, ww, 35, 0);
         gr.GdiDrawText("sortby ^", font.list, color.txt, leftPad+30+tw+35, topPad+75, ww, 35, 0);
-        gr.GdiDrawText("xxx items", font.list, blendColors(font.txt, font.bg, 0.5), leftPad+30+tw+35+tw2+35, topPad+75, ww, 35, 0);
+        gr.GdiDrawText(plman.PlaylistItemCount(plst.activeList) + " tracks", font.list, blendColors(color.txt, color.bg, 0.5), leftPad+30+tw+35+tw2+35, topPad+75, ww, 35, 0);
     }
 
     if (repaint_f) {
         repaint_f = false;
-        //gr.FillSolidRect(0, 0, ww, header_height, 0x50000000);
-        toolbar.draw(gr, prop.Font, prop.Color);
-        //
+        toolbar.draw(gr, font, color);
     }
-
-    //gr.FillSolidRect(0, 0, ww, wh, setAlpha(color.txt, 150));
 }
 
 function on_timer__() {
@@ -834,6 +1019,11 @@ function on_timer__() {
         time222 = d.getTime();
 
     var repaint_1 = repaint_2 = false;
+
+    if (!window.IsVisible || fb_wnd.IsMinimized()) {
+        repaint_main1 = repaint_main2;
+        repaint_f1 = repaint_f2;
+    }
 
     if (repaint_f1 == repaint_f2) {
         repaint_f2 = !repaint_f1;
@@ -908,10 +1098,16 @@ function on_mouse_rbtn_up(x, y, mask) {
 
     plst.onMouse("right", x, y, mask);
 
+    if (y < plst.y) {
+        MainMenu(x, y);
+    }
+
+    return mask != MK_SHIFT;
+
 }
 
 function on_playback_new_track(metadb){
-    plst.showNowPlaying = true;
+    plst.showNowPlaying();
     plst.repaint();
 }
 
@@ -931,19 +1127,24 @@ function on_playback_queue_changed() {
     plst.repaint();
 }
 
+function isPlaylistValid(plid) {
+    return (plid > 0 && plid < plman.PlaylistCount);
+}
 
 function on_playlist_switch() {
     plst.activeList = plman.ActivePlaylist;
     plst.getList();
-    repaint_f1 = repaint_f2;
-
+    plst.showNowPlaying();
+    fb.trace("on_playlist_switch");
     utils.PlaySound(fb.ProfilePath + "se_plst00.wav", 0);
-    if (plman.PlayingPlaylist == plman.ActivePlaylist) {
-        plst.showNowPlaying = true;
-    }
 }
 
 function on_playlists_changed() {
+    fb.trace("on_playlists_changed");
+    if (!isPlaylistValid(plman.ActivePlaylist)) {
+        plman.ActivePlaylist = isPlaylistValid(plman.PlayingPlaylist) ? plman.PlayingPlaylist : 0;
+        return;
+    }
     plst.getList();
 }
 
@@ -981,8 +1182,8 @@ function on_drag_drop(action, x, y, mask) {
         idx = plman.CreatePlaylist(0, "Default");
         plman.ActivePlaylist = 0;
     } else {
-        plman.ClearPlaylistSelection(active_list);
-        idx = active_list;
+        plman.ClearPlaylistSelection(plman.ActivePlaylist);
+        idx = plman.ActivePlaylist;
     }
     if (idx != undefined) {
         action.ToPlaylist();
@@ -993,8 +1194,12 @@ function on_drag_drop(action, x, y, mask) {
 
 
 function on_notify_data(name, info) {
-
-    // ...
+    name = name.toLowerCase();
+    switch (name) {
+        case "show_now_playing":
+            plst.showNowPlaying();
+            break;
+    }
 
 }
 
@@ -1005,6 +1210,7 @@ getColor();
 getFont();
 getImages();
 
+window.DlgCode = DLGC_WANTALLKEYS;
 window.SetInterval(on_timer__, prop.Panel.refreshInterval);
 
 
